@@ -198,11 +198,13 @@ bool VfsSession::LinkSkeleton(const Plan& plan, Report& report)
     return true;
   }
 
-  const auto root = fs::temp_directory_path() / L"aivfs" /
-                    Utf8ToWide(SharedMemoryName(plan.instanceName)) / L"skeleton";
+  const auto instanceDir =
+      fs::temp_directory_path() / L"aivfs" / Utf8ToWide(SharedMemoryName(plan.instanceName));
+  const auto root = instanceDir / L"skeleton";
   std::error_code ec;
-  fs::remove_all(root, ec);
-  skeletonRoot_ = root.wstring();
+  fs::remove_all(instanceDir, ec);
+  // 结束时删整个实例目录，不留空壳。
+  skeletonRoot_ = instanceDir.wstring();
 
   for (size_t i = 0; i < skeleton.links.size(); ++i) {
     const auto& link = skeleton.links[i];
