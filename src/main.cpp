@@ -90,6 +90,7 @@ void WriteStdout(const std::string& text)
 
 int Finish(const Options* options, Report& report)
 {
+  report.finished = true;
   report.endedAtUtc = UtcNowIso8601();
   if (options && !options->reportPath.empty()) {
     if (!WriteReportFile(options->reportPath, report)) {
@@ -148,7 +149,11 @@ int Execute(const Options& options, Report& report)
 
   {
     VfsSession session;
-    session.Run(*parsed.plan, report);
+    session.Run(*parsed.plan, report, [&](const Report& running) {
+      if (!options.reportPath.empty()) {
+        WriteReportFile(options.reportPath, running);
+      }
+    });
   }
   return Finish(&options, report);
 }

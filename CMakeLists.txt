@@ -50,6 +50,7 @@ endfunction()
 add_library(aivfs_core STATIC
   src/plan.cpp
   src/report.cpp
+  src/skeleton.cpp
   src/text.cpp)
 target_include_directories(aivfs_core PUBLIC src)
 target_link_libraries(aivfs_core PUBLIC nlohmann_json::nlohmann_json)
@@ -75,7 +76,7 @@ aivfs_set_options(aivfs_probe)
 
 include(CTest)
 if(BUILD_TESTING)
-  add_executable(aivfs_tests tests/plan_tests.cpp tests/report_tests.cpp tests/test_main.cpp)
+  add_executable(aivfs_tests tests/plan_tests.cpp tests/report_tests.cpp tests/skeleton_tests.cpp tests/test_main.cpp)
   target_include_directories(aivfs_tests PRIVATE ${doctest_header_SOURCE_DIR})
   target_link_libraries(aivfs_tests PRIVATE aivfs_core)
   aivfs_set_options(aivfs_tests)

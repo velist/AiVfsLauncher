@@ -47,7 +47,9 @@ std::string SerializeReport(const Report& report)
   j["schemaVersion"] = 1;
   j["launcherVersion"] = AIVFS_VERSION;
   j["usvfsVersion"] = report.usvfsVersion;
-  j["status"] = report.errorCode == ErrorCode::None ? "ok" : "error";
+  j["status"] = !report.finished                       ? "running"
+                : report.errorCode == ErrorCode::None ? "ok"
+                                                      : "error";
   j["errorCode"] = ErrorCodeName(report.errorCode);
   j["message"] = report.message;
   j["win32Error"] = report.win32Error;

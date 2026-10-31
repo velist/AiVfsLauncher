@@ -1,5 +1,6 @@
 #include "vfs_session.hpp"
 
+#include "skeleton.hpp"
 #include "text.hpp"
 
 #include <windows.h>
@@ -63,6 +64,10 @@ VfsSession::~VfsSession()
   if (job_ != nullptr) {
     CloseHandle(job_);
   }
+  if (!skeletonRoot_.empty()) {
+    std::error_code ec;
+    fs::remove_all(fs::path(skeletonRoot_), ec);
+  }
 }
 
 bool VfsSession::LoadUsvfs(Report& report)
@@ -81,7 +86,8 @@ bool VfsSession::LoadUsvfs(Report& report)
   return true;
 }
 
-bool VfsSession::Run(const Plan& plan, Report& report)
+bool VfsSession::Run(const Plan& plan, Report& report,
+                     const std::function<void(const Report&)>& onStarted)
 {
   if (!Create(plan, report) || !ApplyMappings(plan, report)) {
     return false;
@@ -89,6 +95,9 @@ bool VfsSession::Run(const Plan& plan, Report& report)
   void* process = nullptr;
   if (!Launch(plan, report, process)) {
     return false;
+  }
+  if (onStarted) {
+    onStarted(report);
   }
   WaitForProcessTree(process, report);
   CloseHandle(process);
@@ -145,8 +154,13 @@ bool VfsSession::Create(const Plan& plan, Report& report)
 
 bool VfsSession::ApplyMappings(const Plan& plan, Report& report)
 {
-  // 与 MO2 相同：按清单顺序链接，后链接的覆盖先链接的。
   usvfsClearVirtualMappings();
+  if (!LinkSkeleton(plan, report)) {
+    usvfsClearVirtualMappings();
+    return false;
+  }
+
+  // 与 MO2 相同：按清单顺序链接，后链接的覆盖先链接的。
   for (size_t i = 0; i < plan.mappings.size(); ++i) {
     const auto& m = plan.mappings[i];
     BOOL ok;
@@ -170,6 +184,46 @@ bool VfsSession::ApplyMappings(const Plan& plan, Report& report)
     report.message = std::to_string(report.mappingFailures.size()) + " 条映射建立失败";
     usvfsClearVirtualMappings();
     return false;
+  }
+  return true;
+}
+
+bool VfsSession::LinkSkeleton(const Plan& plan, Report& report)
+{
+  const auto skeleton = PlanSkeleton(plan.mappings, [](const std::wstring& dir) {
+    std::error_code ec;
+    return fs::is_directory(fs::path(dir), ec);
+  });
+  if (skeleton.links.empty()) {
+    return true;
+  }
+
+  const auto root = fs::temp_directory_path() / L"aivfs" /
+                    Utf8ToWide(SharedMemoryName(plan.instanceName)) / L"skeleton";
+  std::error_code ec;
+  fs::remove_all(root, ec);
+  skeletonRoot_ = root.wstring();
+
+  for (size_t i = 0; i < skeleton.links.size(); ++i) {
+    const auto& link = skeleton.links[i];
+    const auto dir = root / std::to_wstring(i);
+    for (const auto& rel : link.relativeDirectories) {
+      fs::create_directories(rel.empty() ? dir : dir / rel, ec);
+      if (ec) {
+        report.errorCode = ErrorCode::MappingFailed;
+        report.win32Error = static_cast<uint32_t>(ec.value());
+        report.message = "无法创建骨架目录：" + WideToUtf8(dir.wstring());
+        return false;
+      }
+    }
+    // 骨架里只有空目录，不会遮住任何文件，所以放在所有映射之前不影响覆盖顺序。
+    if (!usvfsVirtualLinkDirectoryStatic(dir.c_str(), link.missingRoot.c_str(),
+                                         LINKFLAG_RECURSIVE)) {
+      report.errorCode = ErrorCode::MappingFailed;
+      report.win32Error = GetLastError();
+      report.message = "无法建立虚拟目录：" + WideToUtf8(link.missingRoot);
+      return false;
+    }
   }
   return true;
 }

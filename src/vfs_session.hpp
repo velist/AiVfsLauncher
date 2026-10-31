@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <fstream>
 #include <string>
 #include <thread>
@@ -25,11 +26,13 @@ public:
   // 这里显式从启动器所在目录加载，失败就能如实报告，而不是在第一次调用时崩溃。
   static bool LoadUsvfs(Report& report);
 
-  bool Run(const Plan& plan, Report& report);
+  // onStarted 在游戏进程拉起后、开始等待之前调用一次。
+  bool Run(const Plan& plan, Report& report, const std::function<void(const Report&)>& onStarted);
 
 private:
   bool Create(const Plan& plan, Report& report);
   bool ApplyMappings(const Plan& plan, Report& report);
+  bool LinkSkeleton(const Plan& plan, Report& report);
   bool Launch(const Plan& plan, Report& report, void*& processHandle);
   void WaitForProcessTree(void* rootProcess, Report& report);
   void WaitWithUsvfsProcessList(void* rootProcess, Report& report);
@@ -39,6 +42,8 @@ private:
   bool connected_ = false;
   // 作业对象：子进程自动归入，用它判断"整棵进程树都退出了"。
   void* job_ = nullptr;
+  // 启动器自己的骨架目录（见 skeleton.hpp），结束时删除。
+  std::wstring skeletonRoot_;
   std::atomic<bool> pumping_{false};
   std::thread logThread_;
   std::ofstream logStream_;

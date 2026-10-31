@@ -37,6 +37,8 @@ struct MappingFailure
 
 struct Report
 {
+  // false 表示游戏还在运行：启动成功后会先写一份 status=running 的报告，结束时再覆盖。
+  bool finished = false;
   ErrorCode errorCode = ErrorCode::None;
   std::string message;
   uint32_t win32Error = 0;

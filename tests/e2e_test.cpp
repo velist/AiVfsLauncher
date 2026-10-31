@@ -159,6 +159,53 @@ void TestVirtualOverlay(const fs::path& root, const fs::path& launcher, const fs
   Check(!fs::exists(data / L"sub"), "游戏目录里没有 MOD 目录残留");
 }
 
+// 主程序按"最终视图"逐文件映射，目标目录在游戏里往往并不存在。
+void TestFileMappingsIntoMissingDirectories(const fs::path& root, const fs::path& launcher,
+                                            const fs::path& probe)
+{
+  std::printf("\n== 逐文件映射到游戏里不存在的目录 ==\n");
+  const auto data = root / L"文件映射" / L"Data";
+  const auto store = root / L"文件映射" / L"仓库";
+  const auto result = root / L"file-result.json";
+  WriteText(data / L"Skyrim.esm", "esm");
+  WriteText(store / L"pkg1" / L"files" / L"贴图.dds", "texture");
+  WriteText(store / L"pkg2" / L"files" / L"mod.esp", "plugin");
+
+  const auto deepDir = data / L"textures" / L"爱酱" / L"armor";
+  const std::wstring arguments = L"--out " + Q(result) + L" --list " + Q(data) + L" --list " +
+                                 Q(deepDir) + L" --read " + Q(deepDir / L"chest.dds") +
+                                 L" --read " + Q(data / L"mod.esp");
+  json plan;
+  plan["schemaVersion"] = 1;
+  plan["instanceName"] = "e2e_files_" + std::to_string(GetCurrentProcessId());
+  plan["mappings"] = json::array({
+      {{"type", "file"}, {"source", U8(store / L"pkg1" / L"files" / L"贴图.dds")},
+       {"destination", U8(deepDir / L"chest.dds")}},
+      {{"type", "file"}, {"source", U8(store / L"pkg2" / L"files" / L"mod.esp")},
+       {"destination", U8(data / L"mod.esp")}},
+  });
+  plan["launch"] = {{"executable", U8(probe)}, {"arguments", WideToUtf8(arguments)}};
+  WriteText(root / L"file-plan.json", plan.dump(2));
+
+  const long exitCode = RunLauncher(launcher, root / L"file-plan.json", root / L"file-report.json");
+  Check(exitCode == 0, "启动器退出码为 0（实际 " + std::to_string(exitCode) + "）");
+  const auto p = ReadJson(result);
+  if (p.is_discarded()) {
+    Check(false, "结果文件可解析");
+    return;
+  }
+  const auto top = p["lists"][U8(data)];
+  Check(top.is_array() && std::find(top.begin(), top.end(), "textures") != top.end(),
+        "不存在的中间目录在虚拟视图里可见");
+  Check(top.is_array() && std::find(top.begin(), top.end(), "mod.esp") != top.end(),
+        "映射的文件在原目录列表里可见");
+  const auto deep = p["lists"][U8(deepDir)];
+  Check(deep.is_array() && deep.size() == 1 && deep[0] == "chest.dds", "深层目录只含映射的文件");
+  Check(p["reads"][U8(deepDir / L"chest.dds")] == "texture", "改名映射的文件内容正确");
+  Check(p["reads"][U8(data / L"mod.esp")] == "plugin", "映射文件可读");
+  Check(!fs::exists(data / L"textures") && !fs::exists(data / L"mod.esp"), "真实游戏目录未被改动");
+}
+
 void TestInvalidPlan(const fs::path& root, const fs::path& launcher)
 {
   std::printf("\n== 清单格式错误 ==\n");
@@ -207,6 +254,7 @@ int wmain(int argc, wchar_t** argv)
   std::printf("测试目录：%s\n", U8(root).c_str());
 
   TestVirtualOverlay(root, launcher, probe);
+  TestFileMappingsIntoMissingDirectories(root, launcher, probe);
   TestInvalidPlan(root, launcher);
   TestMissingSource(root, launcher, probe);
 

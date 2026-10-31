@@ -90,6 +90,14 @@ AiVfsLauncher version
 
 报告先写临时文件再替换，读到的一定是完整的。
 
+`status` 有三种取值：
+
+- `running`：游戏进程已拉起、启动器正在等它退出。只在 `run` 且给了 `--report` 时出现，此时 `rootProcessId` 已填好。主程序可以据此判断"游戏已经启动"，不必等到游戏退出。
+- `ok`：正常结束。
+- `error`：出错，看 `errorCode`。
+
+启动器结束时会用 `ok` 或 `error` 覆盖掉 `running`。如果主程序发现启动器进程已经退出、报告却还停在 `running`，说明启动器被强行结束了。
+
 ## 退出码
 
 | 值 | errorCode | 含义 | 主程序建议处理 |

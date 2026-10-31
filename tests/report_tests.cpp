@@ -7,9 +7,19 @@
 
 using namespace aivfs;
 
+TEST_CASE("游戏运行中：status=running")
+{
+  Report report;
+  report.rootProcessId = 42;
+  const auto j = nlohmann::json::parse(SerializeReport(report));
+  CHECK(j["status"] == "running");
+  CHECK(j["rootProcessId"] == 42);
+}
+
 TEST_CASE("成功报告：status=ok，可空字段输出 null")
 {
   Report report;
+  report.finished = true;
   const auto j = nlohmann::json::parse(SerializeReport(report));
   CHECK(j["status"] == "ok");
   CHECK(j["errorCode"] == "none");
@@ -21,6 +31,7 @@ TEST_CASE("成功报告：status=ok，可空字段输出 null")
 TEST_CASE("失败报告带上错误详情")
 {
   Report report;
+  report.finished = true;
   report.errorCode = ErrorCode::MappingFailed;
   report.message = "1 条映射建立失败";
   report.mappingFailures.push_back({3, 5});
