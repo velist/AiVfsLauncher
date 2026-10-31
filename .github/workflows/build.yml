@@ -3,7 +3,11 @@ name: build
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
+
+permissions:
+  contents: write
 
 jobs:
   windows:
@@ -27,3 +31,16 @@ jobs:
         with:
           name: AiVfsLauncher-x64
           path: dist/
+
+      # 打 v* 标签时发布：zip 与它的 SHA256 一起上传，爱酱的安装包构建脚本按哈希校验后使用。
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $name = "AiVfsLauncher-${{ github.ref_name }}-x64.zip"
+          Compress-Archive -Path dist/* -DestinationPath $name
+          $hash = (Get-FileHash $name -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $name" | Out-File -Encoding ascii "$name.sha256"
+          gh release create "${{ github.ref_name }}" $name "$name.sha256" --title "${{ github.ref_name }}" --notes "SHA256: $hash" 

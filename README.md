@@ -26,7 +26,13 @@ cmake --build build --config Release
 ctest --test-dir build -C Release
 ```
 
-产物在 `build/Release/`：`AiVfsLauncher.exe` 与 usvfs 的 `usvfs_x64.dll`、`usvfs_x86.dll`、`usvfs_proxy_x64.exe`、`usvfs_proxy_x86.exe`，这五个文件要放在同一目录。运行需要 VC++ 2015–2022 x64 运行库。
+产物在 `build/Release/`：`AiVfsLauncher.exe` 与 usvfs 的 `usvfs_x64.dll`、`usvfs_x86.dll`、`usvfs_proxy_x64.exe`、`usvfs_proxy_x86.exe`，这五个文件要放在同一目录。
+
+`cmake --install build --config Release --prefix dist` 生成发布目录，额外附带 VC++ 运行库 DLL（应用本地部署），没装运行库的电脑上启动器也能运行。注意 usvfs 会被注入游戏进程，游戏进程里仍依赖系统的 VC++ 运行库——主流游戏本身就要求安装它。
+
+## 发布
+
+推送 `v*` 标签后 CI 自动构建、测试并创建 GitHub Release，附 `AiVfsLauncher-<版本>-x64.zip` 及其 SHA256。爱酱MOD管理器的安装包构建脚本按固定版本和哈希下载使用。
 
 ## 测试
 

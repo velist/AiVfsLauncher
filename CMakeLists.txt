@@ -91,3 +91,9 @@ endif()
 
 install(TARGETS AiVfsLauncher RUNTIME DESTINATION .)
 install(FILES ${USVFS_RUNTIME_FILES} LICENSE DESTINATION .)
+
+# VC++ 运行库按应用本地方式随包发布（微软允许再分发 VC redist 目录下的这些 DLL）：
+# 启动器和 usvfs 都动态链接 CRT，没装运行库的电脑上也要能跑起来。
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION .)
+set(CMAKE_INSTALL_UCRT_LIBRARIES FALSE)
+include(InstallRequiredSystemLibraries)
